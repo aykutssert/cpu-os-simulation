@@ -1,0 +1,637 @@
+Begin Data Section
+# System Registers (0-20)
+0 0     # PC - Program Counter
+1 19999 # SP - Stack Pointer
+2 0     # System Call Result
+3 0     # Number of instructions executed so far
+4 0     # Current Thread ID (0=OS, 1-3=threads)
+5 25    # OS syscall handler address
+6 0     # Context switch requested flag
+7 0     # System call type (1=PRN, 2=HLT, 3=YIELD)
+8 0     # System call parameter
+9 1     # Next thread to schedule
+10 0    # 
+11 0    # Reserved
+12 0    # Reserved
+13 0    # Reserved
+14 0    # Reserved
+15 0    # Reserved
+16 0    # Reserved
+17 0    # Reserved
+18 0    # Reserved
+19 0    # Reserved
+20 0    # Reserved
+
+# Thread Table - Each thread uses 10 locations
+# Thread 0 (OS): 21-30
+21 0    # Thread 0 ID
+22 0    # Thread 0 Starting time
+23 0    # Thread 0 Instruction count used
+24 2    # Thread 0 State (0=inactive, 1=ready, 2=running)
+25 0    # Thread 0 PC
+26 19999 # Thread 0 SP
+27 0    # Thread 0 Data 1
+28 0    # Thread 0 Data 2
+29 0    # Thread 0 Data 3
+30 0    # Thread 0 Data 4
+
+# Thread 1 (Bubble Sort): 31-40
+31 1    # Thread 1 ID
+32 0    # Thread 1 Starting time
+33 0    # Thread 1 Instruction count used
+34 1    # Thread 1 State (1=ready)
+35 1000 # Thread 1 PC
+36 1999 # Thread 1 SP
+37 0    # Thread 1 Data 1
+38 0    # Thread 1 Data 2
+39 0    # Thread 1 Data 3
+40 0    # Thread 1 Data 4
+
+# Thread 2 (Linear Search): 41-50
+41 2    # Thread 2 ID
+42 0    # Thread 2 Starting time
+43 0    # Thread 2 Instruction count used
+44 1    # Thread 2 State (1=ready)
+45 2100 # Thread 2 PC
+46 2999 # Thread 2 SP
+47 0    # Thread 2 Data 1
+48 0    # Thread 2 Data 2
+49 0    # Thread 2 Data 3
+50 0    # Thread 2 Data 4
+
+# Thread 3 (Sum Calculator): 51-60
+51 3    # Thread 3 ID
+52 0    # Thread 3 Starting time
+53 0    # Thread 3 Instruction count used
+54 1    # Thread 3 State (1=ready)
+55 3200 # Thread 3 PC
+56 3999 # Thread 3 SP
+57 0    # Thread 3 Data 1
+58 0    # Thread 3 Data 2
+59 0    # Thread 3 Data 3
+60 0    # Thread 3 Data 4
+
+# OS Working Variables 
+500 0   # Current thread
+501 0   # Temp var
+502 0   # Temp var
+503 0   # Temp var
+504 0   # Temp var
+505 0   # Thread state check result
+506 0   # Saved return address
+507 0   # PC temp for USER instruction
+508 0
+
+# Thread 1 Data Area (1000-1099) - Bubble Sort Data  
+1000 4  # Array[0] = 4 (unsorted)
+1001 2  # Array[1] = 2
+1002 3  # Array[2] = 3  
+1003 1  # Array[3] = 1
+1004 4  # Array size (n = 4)
+1005 0  # Outer loop counter (i)
+1006 0  # Inner loop counter (j)
+1007 0  # Temp variable for swap
+1008 0  # Temp variable
+1009 0  # Comparison result
+1010 0  # General temp
+1011 0  # Initialization flag
+1012 0  # Jump temp (for unconditional jumps)
+1020 0  # Thread 1 block counter
+
+# Thread 2 Data Area (2000-2099) - Linear Search Data
+2000 5   # N = number of elements in array
+2001 9   # Key = number to search for  
+2002 3   # Array[0] = first element
+2003 7   # Array[1] = second element
+2004 1   # Array[2] = third element
+2005 9   # Array[3] = fourth element
+2006 2   # Array[4] = fifth element (target!)
+2007 0   # Current index
+2008 -1  # Found position (-1 = not found, 0+ = found at index)
+2009 0   # Current element value
+2010 0   # Initialization flag
+2011 0   # temp var 1
+2012 0   # temp var 2
+2013 0   # temp var 3 (for equality check)
+
+
+
+# Thread 3 Data Area (3000-3099) - Sum Calculator Data
+3000 6 # N - Sum from 1 to this number
+3001 0  # Sum accumulator
+3002 1  # Current number
+3003 0  # temp var
+3004 0  # Initialization flag
+3005 0  # temp var for comparisons
+3006 0  # temp var
+3007 0  # temp var
+3008 0  # temp var
+3009 0  # temp var
+3010 0  # temp var
+3020 0  # Thread 3 block counter 
+
+End Data Section
+
+Begin Instruction Section
+# OS BOOT 
+0 CALL 70    # Initialize OS
+1 CALL 100    # Start main scheduler loop
+2 HLT         # Should not reach here
+
+# SYSTEM CALL HANDLER 
+25 CPY 7 500  # Get system call type
+26 SET 1 501  # PRN control
+27 SUBI 500 501
+28 JIF 501 51  # if type is 1, go to PRN
+29 SET 2 501  # HLT control
+30 SUBI 500 501
+31 JIF 501 58  # if type is 2, go to HLT
+32 SET 3 501  # YIELD control 
+33 SUBI 500 501
+34 JIF 501 63  # if type is 3, go to YIELD
+35 RET        
+
+# PRN System Call Handler 
+51 SET 2 24   # OS is running
+52 CPY 10 507 # current pc (where syscall prn was called from)
+53 CPY 507 500 # store into memory[500] temporarily
+54 CALL 350 # write memory[500] to appropriate thread PC field (35, 45, 55)
+55 SET 1 6    # context switch flag
+56 SET 0 508  # unconditional jump
+57 JIF 508 100 # jump to (scheduler)
+
+# HLT System Call Handler
+58 CALL 300   # go to Thread halter
+59 SET 2 24   # OS is running
+60 SET 1 6    # Context switch flag is true
+61 SET 0 500  
+62 JIF 500 100 # jump to scheduler
+
+# YIELD System Call Handler 
+63 CALL 600   # Make the thread called for YIELD ready
+64 SET 2 24   # Make OS running
+65 CPY 10 500 # current pc (where syscall yield was called from)
+66 CALL 350   # write memory[500] to appropriate thread PC field
+67 SET 1 6    # Set context switch flag
+68 SET 0 500   # Set temp variable = 0  
+69 JIF 500 100 # Jump to scheduler
+
+#OS INITIALIZATION 
+70 SET 1 34   # Thread 1 state = ready
+71 SET 1 44   # Thread 2 state = ready  
+72 SET 1 54   # Thread 3 state = ready
+73 SET 2 24   # OS running
+74 CPY 3 32   # Set Thread 1 start time
+75 CPY 3 42   # Set Thread 2 start time
+76 CPY 3 52   # Set Thread 3 start time
+77 SET 1 6    # TRIGGER INITIAL CONTEXT SWITCH
+78 RET        # Return to caller
+
+# MAIN SCHEDULER LOOP 
+100 CPY 6 500  # Check context switch flag
+101 JIF 500 103 # If flag <= 0, skip context switch
+102 CALL 200   # Do context switch
+103 CALL 470   # Check if all threads are done 
+104 SET 0 500  # Jump back to loop
+105 JIF 500 100 # Always jump (0 <= 0)
+
+# CONTEXT SWITCH 
+200 SET 0 6    # Clear context switch flag
+201 CALL 420   # Save current thread state
+202 CALL 210   # Switch to current next thread
+203 CALL 220   # NOW increment for next time
+204 CALL 470   # Check if all threads are done
+205 RET
+
+# ROUND ROBIN 
+210 CPY 9 500  # Get current next thread
+211 ADD 500 1  # Increment for next time
+212 SET 3 501  # Check if > 3
+213 SUBI 500 501
+214 JIF 501 216 # If <= 3, keep it
+215 SET 1 500  # Else wrap to thread 1
+216 CPY 500 9  # Save incremented value back
+217 RET
+
+# FIND NEXT READY THREAD 
+220 CPY 9 500  # Get next thread to try
+221 CALL 390   # Check if this thread is ready
+222 CPY 505 501 # Get thread state result
+223 SET 0 502  # Check if inactive (0)
+224 SUBI 501 502
+225 JIF 502 229 # If inactive, skip this thread
+226 SET 1 502  # Check if ready (1)
+227 SUBI 501 502
+228 JIF 502 261 # If ready, switch to this thread
+
+# Try thread 1
+229 SET 1 500  # Try thread 1
+230 CALL 390   # Check thread 1 state
+231 CPY 505 501
+232 SET 0 502  # Check if inactive
+233 SUBI 501 502
+234 JIF 502 238 # If inactive, skip
+235 SET 1 502  # Check if ready
+236 SUBI 501 502
+237 JIF 502 270 # If thread 1 ready, switch to it
+
+# Try thread 2
+238 SET 2 500  # Try thread 2
+239 CALL 390   # Check thread 2 state
+240 CPY 505 501
+241 SET 0 502  # Check if inactive
+242 SUBI 501 502
+243 JIF 502 247 # If inactive, skip
+244 SET 1 502  # Check if ready
+245 SUBI 501 502
+246 JIF 502 280 # If thread 2 ready, switch to it
+
+# Try thread 3
+247 SET 3 500  # Try thread 3
+248 CALL 390   # Check thread 3 state
+249 CPY 505 501
+250 SET 0 502  # Check if inactive
+251 SUBI 501 502
+252 JIF 502 256 # If inactive, skip
+253 SET 1 502  # Check if ready
+254 SUBI 501 502
+255 JIF 502 290 # If thread 3 ready, switch to it
+
+256 RET       # No ready threads, stay in OS
+
+# Switch to selected thread 
+261 CPY 500 501 # Get the ready thread ID  
+262 SET 1 502   # Check if thread 1
+263 SUBI 501 502
+264 JIF 502 272 # If thread 1, switch to it
+265 SET 2 502   # Check if thread 2
+266 SUBI 501 502
+267 JIF 502 280 # If thread 2, switch to it
+268 SET 3 502   # Check if thread 3
+269 SUBI 501 502
+270 JIF 502 290 # If thread 3, switch to it
+271 RET         # Unknown thread
+
+# Switch to Thread 1 
+272 SET 1 4    # Set current thread = 1
+273 SET 2 34   # Set thread 1 state = running
+274 SET 1 24   # Set OS state = ready
+275 CPY 35 500 # Get thread 1 PC
+276 SET 1999 1 # Set thread 1 SP
+277 USER 500   # Switch to user mode
+278 RET
+
+# Switch to Thread 2 
+280 SET 2 4    # Set current thread = 2
+281 SET 2 44   # Set thread 2 state = running
+282 SET 1 24   # Set OS state = ready
+283 CPY 45 500 # Get thread 2 PC
+284 SET 2999 1 # Set thread 2 SP
+285 USER 500   # Switch to user mode
+286 RET
+
+# Switch to Thread 3 
+290 SET 3 4    # Set current thread = 3
+291 SET 2 54   # Set thread 3 state = running
+292 SET 1 24   # Set OS state = ready
+293 CPY 55 500 # Get thread 3 PC
+294 SET 3999 1 # Set thread 3 SP
+295 USER 500   # Switch to user mode
+296 RET
+
+# THREAD HALT HANDLER 
+300 CPY 8 500  # Get current thread ID
+301 SET 1 501  # Check if thread 1
+302 SUBI 500 501
+303 JIF 501 313 # If thread 1, halt it
+304 SET 2 501  # Check if thread 2
+305 CPY 8 500  # Reload thread ID
+306 SUBI 500 501
+307 JIF 501 315 # If thread 2, halt it
+308 SET 3 501  # Check if thread 3
+309 CPY 8 500  # Reload thread ID
+310 SUBI 500 501
+311 JIF 501 317 # If thread 3, halt it
+312 RET
+
+313 SET 0 34   # Halt thread 1
+314 RET
+315 SET 0 44   # Halt thread 2
+316 RET
+317 SET 0 54   # Halt thread 3
+318 RET
+
+# SAVE PC TO THREAD TABLE 
+350 CPY 11 501  # Get current thread ID
+
+# Save for Thread 1
+351 SET 1 502  # Check if thread ID == 1
+352 SUBI 501 502
+353 JIF 502 363 # If equal, jump to save for thread 1
+
+# Save for Thread 2
+354 SET 2 502
+355 CPY 11 501  # Reload current thread ID
+356 SUBI 501 502
+357 JIF 502 365 # If equal, jump to save for thread 2
+
+# Save for Thread 3
+358 SET 3 502
+359 CPY 11 501  # Reload current thread ID
+360 SUBI 501 502
+361 JIF 502 370 # If equal, jump to save for thread 3
+362 RET        # Unknown thread
+
+# Save PC for Thread 1
+363 CPY 500 35 # Save PC to thread 1's PC field
+364 RET
+
+# Save PC for Thread 2
+365 CPY 500 45 # Save PC to thread 2's PC field
+366 RET
+
+# Save PC for Thread 3
+370 CPY 500 55 # Save PC to thread 3's PC field
+371 RET
+
+# GET THREAD STATE HELPER 
+# Input: memory[500] = thread ID, Output: memory[505] = thread state
+390 CPY 500 502 # Get thread ID
+391 SET 1 503   # Check thread 1
+392 SUBI 502 503
+393 JIF 503 406 # If thread 1, get its state
+394 SET 2 503   # Check thread 2
+395 CPY 500 502 # Reload thread ID
+396 SUBI 502 503
+397 JIF 503 408 # If thread 2, get its state
+398 SET 3 503   # Check thread 3
+399 CPY 500 502 # Reload thread ID
+400 SUBI 502 503
+401 JIF 503 410 # If thread 3, get its state
+402 SET 0 505   # Default: inactive
+403 RET
+
+406 CPY 34 505  # Get thread 1 state
+407 RET
+408 CPY 44 505  # Get thread 2 state
+409 RET
+410 CPY 54 505  # Get thread 3 state
+411 RET
+
+# SAVE CURRENT THREAD STATE 
+420 CPY 4 500  # Get current thread
+421 SET 0 501  # Check if OS
+422 SUBI 500 501
+423 JIF 501 437 # If OS, save OS state
+424 SET 1 501  # Check if thread 1
+425 CPY 4 500  # Reload current thread
+426 SUBI 500 501
+427 JIF 501 441 # If thread 1, save thread 1
+428 SET 2 501  # Check if thread 2
+429 CPY 4 500  # Reload current thread
+430 SUBI 500 501
+431 JIF 501 450 # If thread 2, save thread 2
+432 SET 3 501  # Check if thread 3
+433 CPY 4 500  # Reload current thread
+434 SUBI 500 501
+435 JIF 501 460 # If thread 3, save thread 3
+436 RET
+
+# Save OS state
+437 CPY 0 25   # Save PC
+438 CPY 1 26   # Save SP
+439 RET
+
+# Save Thread 1 state
+441 CPY 0 35   # Save PC
+442 CPY 1 36   # Save SP
+443 SET 1 34   # Set thread 1 to ready
+444 RET
+
+# Save Thread 2 state
+450 CPY 0 45   # Save PC
+451 CPY 1 46   # Save SP
+452 SET 1 44   # Set thread 2 to ready
+453 RET
+
+# Save Thread 3 state
+460 CPY 0 55   # Save PC
+461 CPY 1 56   # Save SP
+462 SET 1 54   # Set thread 3 to ready
+463 RET
+
+
+# ALL THREADS DONE CHECKer
+470 SET 1 500  # Check thread 1
+471 CALL 390   # Get thread 1 state
+472 CPY 505 501
+473 SET 1 502  # Compare with 1
+474 SUBI 501 502 # state - 1
+475 JIF 502 489 # If state >= 1, thread is active, return
+
+476 SET 2 500  # Check thread 2
+477 CALL 390   # Get thread 2 state
+478 CPY 505 501
+479 SET 1 502  # Compare with 1
+480 SUBI 501 502 # state - 1
+481 JIF 502 489 # If state >= 1, thread is active, return
+
+482 SET 3 500  # Check thread 3
+483 CALL 390   # Get thread 3 state
+484 CPY 505 501
+485 SET 1 502  # Compare with 1
+486 SUBI 501 502 # state - 1
+487 JIF 502 489 # If state >= 1, thread is active, return
+
+488 HLT        # All threads are inactive - halt OS
+489 RET        # At least one thread is active
+
+
+# MAKE CALLING THREAD READY
+600 CPY 11 500  # Get current thread ID from memory[11]
+601 SET 0 501   # Check if OS (should not happen)
+602 SUBI 500 501
+603 JIF 501 618 # If OS, skip (should not happen)
+604 SET 1 501  # Check if thread 1
+605 CPY 11 500  # Reload thread ID
+606 SUBI 500 501
+607 JIF 501 617 # If thread 1, make it ready
+608 SET 2 501  # Check if thread 2
+609 CPY 11 500  # Reload thread ID
+610 SUBI 500 501
+611 JIF 501 619 # If thread 2, make it ready
+612 SET 3 501  # Check if thread 3
+613 CPY 11 500  # Reload thread ID
+614 SUBI 500 501
+615 JIF 501 621 # If thread 3, make it ready
+616 RET
+
+617 SET 1 34   # Set thread 1 to ready
+618 RET
+619 SET 1 44   # Set thread 2 to ready
+620 RET
+621 SET 1 54   # Set thread 3 to ready
+622 RET
+623 RET        # OS case (should not happen)
+
+# Thread 1 Instructions (1000-1099) - Complete Bubble Sort
+1000 CPY 1011 1008     # Load initialization flag
+1001 JIF 1008 1004     # If flag > 0, skip init
+1002 SET 1 1011        # Set initialization flag = 1
+1003 SET 0 1005        # Initialize pass counter = 0
+
+# Pass 1 (3 comparisons)
+1004 CPY 1000 1008     # Load array[0]
+1005 CPY 1001 1009     # Load array[1]
+1006 SUBI 1008 1009    # array[0] - array[1]
+1007 JIF 1009 1011     # If array[0] <= array[1], skip swap
+1008 CPY 1000 1007     # Save array[0]
+1009 CPY 1001 1000     # array[1] -> array[0]
+1010 CPY 1007 1001     # saved -> array[1]
+
+1011 CPY 1001 1008     # Load array[1]
+1012 CPY 1002 1009     # Load array[2]
+1013 SUBI 1008 1009    # array[1] - array[2]
+1014 JIF 1009 1018     # If array[1] <= array[2], skip swap
+1015 CPY 1001 1007     # Save array[1]
+1016 CPY 1002 1001     # array[2] -> array[1]
+1017 CPY 1007 1002     # saved -> array[2]
+
+1018 CPY 1002 1008     # Load array[2]
+1019 CPY 1003 1009     # Load array[3]
+1020 SUBI 1008 1009    # array[2] - array[3]
+1021 JIF 1009 1025     # If array[2] <= array[3], skip swap
+1022 CPY 1002 1007     # Save array[2]
+1023 CPY 1003 1002     # array[3] -> array[2]
+1024 CPY 1007 1003     # saved -> array[3]
+
+# Pass 2 (2 comparisons)
+1025 CPY 1000 1008     # Load array[0]
+1026 CPY 1001 1009     # Load array[1]
+1027 SUBI 1008 1009    # array[0] - array[1]
+1028 JIF 1009 1032     # If array[0] <= array[1], skip swap
+1029 CPY 1000 1007     # Save array[0]
+1030 CPY 1001 1000     # array[1] -> array[0]
+1031 CPY 1007 1001     # saved -> array[1]
+
+1032 CPY 1001 1008     # Load array[1]
+1033 CPY 1002 1009     # Load array[2]
+1034 SUBI 1008 1009    # array[1] - array[2]
+1035 JIF 1009 1039     # If array[1] <= array[2], skip swap
+1036 CPY 1001 1007     # Save array[1]
+1037 CPY 1002 1001     # array[2] -> array[1]
+1038 CPY 1007 1002     # saved -> array[2]
+
+# Pass 3 (1 comparison)
+1039 CPY 1000 1008     # Load array[0]
+1040 CPY 1001 1009     # Load array[1]
+1041 SUBI 1008 1009    # array[0] - array[1]
+1042 JIF 1009 1046     # If array[0] <= array[1], skip swap
+1043 CPY 1000 1007     # Save array[0]
+1044 CPY 1001 1000     # array[1] -> array[0]
+1045 CPY 1007 1001     # saved -> array[1]
+
+# Print sorted array
+1046 SYSCALL PRN 1000  # Print array[0]
+1047 SYSCALL PRN 1001  # Print array[1]
+1048 SYSCALL PRN 1002  # Print array[2]  
+1049 SYSCALL PRN 1003  # Print array[3]
+1050 SYSCALL HLT       # Halt thread
+
+# Thread 2 Instructions - Linear Search
+# 1. Initialization
+2100 CPY 2010 2011     # Load initialized flag
+2101 JIF 2011 2103     # If flag <= 0 do init
+2102 SET 0 2013        # Set 0 for unconditional jump
+2103 JIF 2013 2106     # Unconditional jump to main loop
+
+# Initialization
+2104 SET 0 2007        # i = 0
+2105 SET -1 2008       # found = -1
+2106 SET 1 2010        # Set initialized flag = 1
+
+# 2. Main Loop - Bounds Check
+2107 CPY 2000 2011     # Load N (5)
+2108 CPY 2007 2012     # Load i
+2109 SUBI 2011 2012    # N - i (result in 2012)
+2110 JIF 2012 2135     # If N - i <= 0 (i >= N), exit to not_found
+
+# 3. Array Element Loading
+2111 SET 2002 2011     # Base address = 2002
+2112 CPY 2007 2012     # Copy i
+2113 ADDI 2011 2012    # 2002 + i (result in 2011)
+2114 CPYI 2011 2009    # Load arr[i] into 2009
+
+# 4. Equality Check - First Direction (arr[i] - key)
+2115 CPY 2009 2011     # Load arr[i]
+2116 CPY 2001 2012     # Load key
+2117 SUBI 2011 2012    # arr[i] - key (result in 2012)
+2118 JIF 2012 2121     # If arr[i] - key <= 0, go to second check
+2119 SET 0 2013        # arr[i] > key, set jump flag
+2120 JIF 2013 2130     # Jump to continue loop
+
+# 5. Equality Check - Second Direction (key - arr[i])
+2121 CPY 2001 2011     # Load key
+2122 CPY 2009 2012     # Load arr[i]
+2123 SUBI 2011 2012    # key - arr[i] (result in 2012)
+2124 JIF 2012 2127     # If key - arr[i] <= 0, FOUND!
+2125 SET 0 2013        # key > arr[i], set jump flag
+2126 JIF 2013 2130     # Jump to continue loop
+
+# 6. Found!
+2127 CPY 2007 2008     # Set found position = current index i
+2128 SYSCALL PRN 2008  # Print found index
+2129 SYSCALL HLT       # Halt immediately
+
+# 7. Continue Loop - Increment i
+2130 SET 1 2011        # Load 1
+2131 ADDI 2007 2011    # i = i + 1
+2132 SYSCALL YIELD
+2133 SET 0 2013        # Set up for unconditional jump
+2134 JIF 2013 2107     # Back to main loop
+2135 SET -1 2013       # Padding with proper syntax
+2136 JIF 2013 2137     # Padding jump
+
+# 8. Not Found
+2137 SYSCALL PRN 2008  # Print found position (-1)
+2138 SYSCALL HLT       # Halt thread
+
+
+
+# Thread 3 Instructions (3200-3299) - Sum Calculator
+3200 CPY 3004 3005     # Load initialized flag
+3201 JIF 3005 3203     # If flag <= 0 do init
+3202 JIF 0 3206
+
+3203 SET 0 3001        # Initialize sum = 0
+3204 SET 1 3002        # Initialize current = 1
+3205 SET 1 3004        # Set initialized flag = 1
+
+# Main loop
+3206 CPY 3000 3003     # Load N (10)
+3207 CPY 3002 3005     # Load current
+3208 SUBI 3003 3005    # N - current (result in 3005)
+3209 JIF 3005 3218     # If N - current <= 0 (current > N), done
+
+# Add current to sum
+3210 CPY 3001 3006     # Load current sum
+3211 ADDI 3006 3002    # Add current to sum (result in 3006)
+3212 CPY 3006 3001     # Store sum back
+3213 ADD 3002 1        # current++
+3214 SYSCALL PRN 3001
+3215 SYSCALL YIELD     # Yield to other threads
+3216 SET 0 3020        # Set temp variable = 0
+3217 JIF 3020 3206     # Always jump back to loop
+
+# Print result and halt
+3218 SYSCALL HLT  
+
+
+End Instruction Section
+
+
+
+
+
+
+
